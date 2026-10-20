@@ -6,6 +6,7 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 - `python calistir.pyw` -> ilk kurulum (lisans onayi, indirme, AVD, .apk iliskilendirme)
 - `python calistir.pyw dosya.apk` -> kur ve kendi penceresinde ac
 - `python calistir.pyw --durdur` -> Android'i kapat (snapshot kaydedilir)
+- Exe: CI artifact'i ya da yerelde `python -m PyInstaller --onefile --noconsole --name ApkCalistirici calistir.pyw`
 - `python calistir.pyw --konum E:\klasor` -> bilesen klasorunu kalici ayarla (HKCU\Software\ApkCalistirici\Kok)
 - Testler: `python -m unittest`
 
@@ -44,12 +45,16 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 - Veri diski bos alana gore 2-8 GB (emulator 1.2 kati bos alan ister). GPU once host, acilmazsa auto.
 - Manifest okuyucu Downloads'taki 12 APK'nin hepsinde dogru calisti.
 
+- GitHub Actions (.github/workflows/derle.yml): windows-latest, unittest, PyInstaller 6.22.3 --onefile --noconsole, duman testi (exe --iliskiyi-kaldir), artifact "ApkCalistirici" (~10 MB exe). Ilk calisma basarili (run 39492309631).
+- Exe ilk calismada kendini KOK\ApkCalistirici.exe'ye kopyalar, iliskilendirme o kopyayi gosterir (indirilen exe silinse de calisir). Applications\ApkCalistirici.exe kaydi ile 'Birlikte ac' listesinde gorunur.
+- Iliskilendirme exe ile dogrulandi (2026-10-20): HKCR\.apk -> ApkCalistirici.apk; Start-Process dosya.apk (Gezgin cift tikla ayni yol) -> uygulama penceresi acildi. Onceki varsayilan (LDPlayer, ldmnq.apk) HKCU\Software\ApkCalistirici\OncekiApkUygulamasi'na kaydedilir; --iliskiyi-kaldir onu geri yukler (dogrulandi). Kullanicinin PC'sinde iliskilendirme SU AN AKTIF. Ilk kayit yedekleri: E:\cloude\kayit-yedek.
+
 ## Siradaki
-1. GitHub Actions: PyInstaller ile tek exe (calistir.pyw giris noktasi, --noconsole) + unittest
-2. .apk iliskilendirmesi gercek kayit defterinde HENUZ TEST EDILMEDI (gelistirme modunda pythonw+repo yolunu yazar; exe ile test edilmeli). Kullanicinin onceden sectigi UserChoice varsa Windows'un 'Birlikte ac' ile secilmesi gerekiyor.
-3. Pencere basligi su an paket adi; uygulama etiketi (resources.arsc) okunabilir ya da scrcpy ciktisindaki 'Starting app "X"' kullanilabilir
-4. Sadece arm64 APK'lar: x86_64 imajda ARM ceviri var mi test edilmeli (orn. Eden, mlc-chat, ReVanced)
-5. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
+1. Pencere basligi su an paket adi; uygulama etiketi (resources.arsc) okunabilir ya da scrcpy ciktisindaki 'Starting app "X"' kullanilabilir
+2. Sadece arm64 APK'lar: x86_64 imajda ARM ceviri var mi test edilmeli (orn. Eden, mlc-chat, ReVanced)
+3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
+4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)
+5. Kurulu APK'yi tekrar acarken 4 sn scrcpy denetim beklemesi kisaltilabilir (pencere acildigini gunlukten anla)
 
 ## Bilinen sorunlar
 - Bulut ortamindan dl.google.com ve GitHub API erisilemiyor; indirme/test sadece kullanicinin PC'sinde

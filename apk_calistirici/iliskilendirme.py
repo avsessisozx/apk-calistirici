@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 
 PROGID = "ApkCalistirici.apk"
 EXE_ADI = "ApkCalistirici.exe"
+ONCEKI_DEGER = "OncekiApkUygulamasi"
 SINIFLAR = r"Software\Classes"
 KULLANICI_SECIMI = r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.apk\UserChoice"
 SHCNE_ASSOCCHANGED = 0x08000000
@@ -48,6 +49,18 @@ def _komut():
     return f'"{yorumlayici}" "{baslatici}" "%1"', str(yorumlayici)
 
 
+def _oku(yol, ad=""):
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, yol) as k:
+            return winreg.QueryValueEx(k, ad)[0]
+    except OSError:
+        return None
+
+
+def _varsayilan():
+    return _oku(rf"{SINIFLAR}\.apk")
+
+
 def _yaz(yol, deger, ad=""):
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, yol) as k:
         winreg.SetValueEx(k, ad, 0, winreg.REG_SZ, deger)
@@ -59,6 +72,10 @@ def iliskilendir():
     _yaz(rf"{SINIFLAR}\{PROGID}\DefaultIcon", f'"{simge}",0')
     _yaz(rf"{SINIFLAR}\{PROGID}\shell\open", "Android'de aç")
     _yaz(rf"{SINIFLAR}\{PROGID}\shell\open\command", komut)
+    onceki = _varsayilan()
+    if onceki and onceki != PROGID:
+        # Kaldirilinca eski uygulama (orn. LDPlayer) geri gelsin.
+        _yaz(ayarlar.KAYIT_ANAHTARI, onceki, ONCEKI_DEGER)
     _yaz(rf"{SINIFLAR}\.apk", PROGID)
     _yaz(rf"{SINIFLAR}\.apk\OpenWithProgids", "", PROGID)
     # 'Birlikte ac' listesinde dogru adla gorunsun
@@ -86,11 +103,7 @@ def iliskili_mi():
     secim = kullanici_secimi()
     if secim and secim != PROGID:
         return False
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{SINIFLAR}\.apk") as k:
-            return winreg.QueryValueEx(k, "")[0] == PROGID
-    except OSError:
-        return False
+    return _varsayilan() == PROGID
 
 
 def birlikte_ac_penceresi(apk_yolu):
@@ -122,13 +135,8 @@ def kaldir():
             winreg.DeleteValue(k, PROGID)
     except OSError:
         pass
-    try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{SINIFLAR}\.apk") as k:
-            bizim = winreg.QueryValueEx(k, "")[0] == PROGID
-    except OSError:
-        bizim = False
-    if bizim:
-        _yaz(rf"{SINIFLAR}\.apk", "")
+    if _varsayilan() == PROGID:
+        _yaz(rf"{SINIFLAR}\.apk", _oku(ayarlar.KAYIT_ANAHTARI, ONCEKI_DEGER) or "")
     _agaci_sil(rf"{SINIFLAR}\{PROGID}")
     _agaci_sil(rf"{SINIFLAR}\Applications\{EXE_ADI}")
     ctypes.windll.shell32.SHChangeNotify(SHCNE_ASSOCCHANGED, 0, None, None)
