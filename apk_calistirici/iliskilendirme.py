@@ -1,20 +1,46 @@
 """.apk dosyalarini bu uygulamayla iliskilendirir (HKCU, yonetici gerekmez)."""
 
 import ctypes
+import logging
+import shutil
 import subprocess
 import sys
 import winreg
 from pathlib import Path
 
+from . import ayarlar
+
+log = logging.getLogger(__name__)
+
 PROGID = "ApkCalistirici.apk"
+EXE_ADI = "ApkCalistirici.exe"
 SINIFLAR = r"Software\Classes"
 KULLANICI_SECIMI = r"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.apk\UserChoice"
 SHCNE_ASSOCCHANGED = 0x08000000
 
 
+def kurulu_exe():
+    return ayarlar.KOK / EXE_ADI
+
+
+def kendini_kopyala():
+    """Exe'yi bilesen klasorune kopyalar; indirilen exe silinse de iliskilendirme calisir."""
+    hedef = kurulu_exe()
+    kaynak = Path(sys.executable).resolve()
+    if kaynak == hedef.resolve():
+        return hedef
+    try:
+        shutil.copy2(kaynak, hedef)
+    except OSError:
+        # Kopya baska bir pencerede calisiyorsa eskisi kalir.
+        log.warning("%s güncellenemedi", hedef, exc_info=True)
+    return hedef
+
+
 def _komut():
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}" "%1"', sys.executable
+        exe = kendini_kopyala()
+        return f'"{exe}" "%1"', str(exe)
     # Gelistirme: konsolsuz python ile depo kokundeki baslaticiyi calistir.
     pythonw = Path(sys.executable).with_name("pythonw.exe")
     yorumlayici = pythonw if pythonw.exists() else Path(sys.executable)
@@ -35,6 +61,11 @@ def iliskilendir():
     _yaz(rf"{SINIFLAR}\{PROGID}\shell\open\command", komut)
     _yaz(rf"{SINIFLAR}\.apk", PROGID)
     _yaz(rf"{SINIFLAR}\.apk\OpenWithProgids", "", PROGID)
+    # 'Birlikte ac' listesinde dogru adla gorunsun
+    uygulama = rf"{SINIFLAR}\Applications\{EXE_ADI}"
+    _yaz(uygulama, ayarlar.UYGULAMA_ADI, "FriendlyAppName")
+    _yaz(rf"{uygulama}\SupportedTypes", "", ".apk")
+    _yaz(rf"{uygulama}\shell\open\command", komut)
     ctypes.windll.shell32.SHChangeNotify(SHCNE_ASSOCCHANGED, 0, None, None)
 
 
@@ -67,6 +98,22 @@ def birlikte_ac_penceresi(apk_yolu):
     subprocess.Popen(["rundll32.exe", "shell32.dll,OpenAs_RunDLL", str(apk_yolu)])
 
 
+def _agaci_sil(yol):
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, yol) as k:
+            altlar = []
+            while True:
+                try:
+                    altlar.append(winreg.EnumKey(k, len(altlar)))
+                except OSError:
+                    break
+        for alt in altlar:
+            _agaci_sil(rf"{yol}\{alt}")
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, yol)
+    except OSError:
+        pass
+
+
 def kaldir():
     try:
         with winreg.OpenKey(
@@ -82,9 +129,6 @@ def kaldir():
         bizim = False
     if bizim:
         _yaz(rf"{SINIFLAR}\.apk", "")
-    for alt in (r"shell\open\command", r"shell\open", "shell", "DefaultIcon", ""):
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, rf"{SINIFLAR}\{PROGID}\{alt}".rstrip("\\"))
-        except OSError:
-            pass
+    _agaci_sil(rf"{SINIFLAR}\{PROGID}")
+    _agaci_sil(rf"{SINIFLAR}\Applications\{EXE_ADI}")
     ctypes.windll.shell32.SHChangeNotify(SHCNE_ASSOCCHANGED, 0, None, None)
