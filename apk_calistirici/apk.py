@@ -8,7 +8,7 @@ import zipfile
 from dataclasses import dataclass, field
 
 from . import dizgi_havuzu
-from .kaynak_tablosu import KaynakTablosu
+from .kaynak_tablosu import YOGUNLUK_HER, KaynakTablosu
 
 log = logging.getLogger(__name__)
 
@@ -26,7 +26,15 @@ KAYNAK_KIMLIKLERI = {
     0x0101021C: "versionName",
     0x0101020C: "minSdkVersion",
     0x01010001: "label",
+    0x01010002: "icon",
 }
+
+# Pencere simgesi olarak kullanilabilecek bitmap'ler (uyarlanabilir simge XML'leri degil)
+BITMAP_UZANTILARI = (".png", ".webp")
+# Simge XML'inde izlenecek (eleman, oznitelik) ciftleri, tercih sirasiyla. Uyarlanabilir
+# simgenin arka plani cogunlukla duz renk oldugundan on plan katmani tek basina kullanilir.
+XML_SIMGE_KATMANLARI = (("foreground", "drawable"), ("bitmap", "src"), ("background", "drawable"))
+EN_DERIN_XML = 3
 
 
 class Referans(int):
@@ -40,6 +48,7 @@ class ApkBilgisi:
     surum_adi: str = ""
     min_sdk: int = 0
     etiket: str = ""  # uygulamanin gorunen adi; bulunamazsa bos
+    simge: str = ""  # APK icindeki en buyuk simge bitmap'inin yolu; bulunamazsa bos
     abiler: list = field(default_factory=list)
 
     @property
@@ -72,29 +81,80 @@ def oku(yol, diller=None):
             abiler = sorted({ad.split("/")[1] for ad in z.namelist() if ad.startswith("lib/") and ad.count("/") >= 2})
             bilgi = manifest_coz(manifest)
             bilgi.abiler = abiler
-            if isinstance(bilgi.etiket, Referans):
-                bilgi.etiket = _etiket_coz(z, bilgi.etiket, sistem_dilleri() if diller is None else diller)
+            if isinstance(bilgi.etiket, Referans) or isinstance(bilgi.simge, Referans):
+                tablo = _kaynak_tablosu(z)
+                if isinstance(bilgi.etiket, Referans):
+                    bilgi.etiket = _etiket_coz(tablo, bilgi.etiket, sistem_dilleri() if diller is None else diller)
+                if isinstance(bilgi.simge, Referans):
+                    bilgi.simge = _simge_coz(z, tablo, bilgi.simge)
     except (zipfile.BadZipFile, KeyError, OSError) as e:
         raise ApkHatasi(f"Geçerli bir APK değil: {e}") from e
     return bilgi
 
 
-def _etiket_coz(z, kimlik, diller):
-    # Uygulama adi bulunamazsa paket adi kullanilir; APK'yi acmaya engel degil.
+# Ad ve simge bulunamazsa paket adi ve scrcpy'nin simgesi kullanilir; APK'yi acmaya engel degil.
+OKUMA_HATALARI = (KeyError, ValueError, struct.error, IndexError)
+
+
+def _kaynak_tablosu(z):
     try:
-        return KaynakTablosu(z.read("resources.arsc")).dizgi(kimlik, diller) or ""
-    except (KeyError, ValueError, struct.error, IndexError):
+        return KaynakTablosu(z.read("resources.arsc"))
+    except OKUMA_HATALARI:
+        log.warning("resources.arsc okunamadı", exc_info=True)
+        return None
+
+
+def _etiket_coz(tablo, kimlik, diller):
+    try:
+        return (tablo and tablo.dizgi(kimlik, diller)) or ""
+    except OKUMA_HATALARI:
         log.warning("Uygulama adı okunamadı (%#x)", kimlik, exc_info=True)
         return ""
 
 
-def manifest_coz(veri):
+def _simge_coz(z, tablo, kimlik):
+    try:
+        return _simge_bitmapi(z, tablo, kimlik, set(z.namelist())) if tablo else ""
+    except OKUMA_HATALARI + (ApkHatasi,):
+        log.warning("Uygulama simgesi okunamadı (%#x)", kimlik, exc_info=True)
+        return ""
+
+
+def _simge_bitmapi(z, tablo, kimlik, zip_icindekiler, derinlik=0):
+    """Simgenin en yuksek yogunluklu bitmap'i.
+
+    Yalnizca XML varsa (<adaptive-icon>, <bitmap src>) gosterdigi cizimler izlenir; vektor
+    cizimler (<vector>) cizilemedigi icin atlanir.
+    """
+    dosyalar = [(y, yol) for y, yol in tablo.dosyalar(kimlik) if yol in zip_icindekiler]
+    bitmapler = [
+        (yogunluk if yogunluk < YOGUNLUK_HER else 0, yol)
+        for yogunluk, yol in dosyalar
+        if yol.lower().endswith(BITMAP_UZANTILARI)
+    ]
+    if bitmapler:
+        return max(bitmapler)[1]
+    if derinlik >= EN_DERIN_XML:
+        return ""
+    for _, yol in sorted(dosyalar, reverse=True):
+        if not yol.lower().endswith(".xml"):
+            continue
+        katmanlar = {ad: oz for ad, oz in xml_elemanlari(z.read(yol))}
+        for eleman, oznitelik in XML_SIMGE_KATMANLARI:
+            hedef = katmanlar.get(eleman, {}).get(oznitelik)
+            if isinstance(hedef, Referans):
+                bulunan = _simge_bitmapi(z, tablo, hedef, zip_icindekiler, derinlik + 1)
+                if bulunan:
+                    return bulunan
+    return ""
+
+
+def xml_elemanlari(veri):
+    """Ikili XML'deki elemanlari (ad, oznitelikler) olarak sirayla verir."""
     tur, baslik_boyu, _ = struct.unpack_from("<HHI", veri, 0)
     if tur != XML:
-        raise ApkHatasi("AndroidManifest.xml ikili XML değil.")
+        raise ApkHatasi("İkili XML değil.")
     dizgiler, kaynaklar = [], []
-    oznitelikler = {}
-    etiket = ""
     konum = baslik_boyu
     while konum + 8 <= len(veri):
         tur, baslik_boyu, boyut = struct.unpack_from("<HHI", veri, konum)
@@ -105,13 +165,23 @@ def manifest_coz(veri):
         elif tur == XML_RESOURCE_MAP:
             kaynaklar = list(struct.unpack_from(f"<{(boyut - baslik_boyu) // 4}I", veri, konum + baslik_boyu))
         elif tur == XML_START_ELEMENT:
-            ad, ozellikler = _eleman(veri, konum, baslik_boyu, dizgiler, kaynaklar)
+            yield _eleman(veri, konum, baslik_boyu, dizgiler, kaynaklar)
+        konum += boyut
+
+
+def manifest_coz(veri):
+    oznitelikler = {}
+    etiket = simge = ""
+    try:
+        for ad, ozellikler in xml_elemanlari(veri):
             if ad in ("manifest", "uses-sdk"):
                 oznitelikler.update(ozellikler)
             if ad == "application":
                 etiket = ozellikler.get("label", "")
+                simge = ozellikler.get("icon", "")
                 break
-        konum += boyut
+    except ApkHatasi:
+        raise ApkHatasi("AndroidManifest.xml ikili XML değil.") from None
 
     paket = oznitelikler.get("package")
     if not paket:
@@ -122,6 +192,7 @@ def manifest_coz(veri):
         surum_adi=str(oznitelikler.get("versionName") or ""),
         min_sdk=_tamsayi(oznitelikler.get("minSdkVersion")),
         etiket=etiket if isinstance(etiket, Referans) else str(etiket),
+        simge=simge if isinstance(simge, Referans) else "",
     )
 
 

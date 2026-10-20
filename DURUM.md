@@ -6,7 +6,10 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 - `python calistir.pyw` -> ilk kurulum (lisans onayi, indirme, AVD, .apk iliskilendirme)
 - `python calistir.pyw dosya.apk` -> kur ve kendi penceresinde ac
 - `python calistir.pyw --durdur` -> Android'i kapat (snapshot kaydedilir)
-- Exe: CI artifact'i ya da yerelde `python -m PyInstaller --onefile --noconsole --name ApkCalistirici calistir.pyw`
+- Bagimlilik: `pip install -r requirements.txt` (pillow==12.3.0)
+- Exe: CI artifact'i ya da yerelde `E:\clouderaclar\py312	ools\python.exe -m PyInstaller --clean --onefile --noconsole --name ApkCalistirici calistir.pyw`
+  - Yerel Python 3.10.0 KULLANILAMAZ: dis modulundeki hata yuzunden PIL.Image taranirken PyInstaller cokuyor (3.10 sonraki surumlerde duzeldi).
+  - E:\clouderaclar\py312 = python.org NuGet paketi 3.12.10 + resmi tcltk.msi (msiexec /a ile klasore acildi; NuGet paketinde tkinter yok). Sisteme kurulum yapilmadi.
 - `python calistir.pyw --konum E:\klasor` -> bilesen klasorunu kalici ayarla (HKCU\Software\ApkCalistirici\Kok)
 - Testler: `python -m unittest`
 
@@ -54,9 +57,10 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
   - Eden (dev.legacy.eden_emulator, arm64): acilista SIGILL ile coktu. ndk_translation "Undefined instruction 0xd53be000" = MRS x0, CNTFRQ_EL0 desteklenmiyor. Ceviriyle calismaz (Switch emulatoru, zaten agir JIT).
 - Acilis cokme denetimi (cokme.py): scrcpy baslatildiktan sonra 5 sn boyunca logcat (-T cihaz saati, -s ndk_translation/AndroidRuntime/libc/ActivityManager) ve pidof izlenir. ARM ceviri hatasi > Java cokmesi > yerel sinyal sirasiyla siniflandirilir, bos pencere kapatilir, Turkce aciklama gosterilir. Eden ile exe uzerinden dogrulandi (cokme 1.4 sn'de yakalandi); KeyAttestation'da yanlis alarm yok. Bu denetim kurulu uygulamayi acmayi ~5 sn yapiyor (onceki 4 sn scrcpy beklemesinin yerine).
 - Pencere basligi = uygulamanin gercek adi (2026-10-20): manifest'teki application android:label; referanssa resources.arsc okunur (kaynak_tablosu.py: standart/kompakt/sparse/offset16 girdiler, referans zinciri). Dil tercihi: Windows arayuz dili, en, dilsiz varsayilan. Okunamazsa paket adi. Downloads'taki 12 APK'nin hepsinde ad bulundu (en yavas 480 ms), exe ile 3 pencerede dogrulandi ("APKMirror Yukleyici (beta)" Turkce secildi). Durum ve cokme mesajlari da adi kullanir.
+- Pencere simgesi = APK'nin simgesi (2026-10-20): manifest application android:icon -> resources.arsc'den en yuksek yogunluklu PNG/WebP; yalnizca XML varsa <adaptive-icon> on plani / <bitmap src> izlenir (vektor cizimler atlanir). simge.py Pillow ile 256x256 RGBA PNG'ye cevirir (scrcpy'nin ffmpeg'i WebP cozemiyor - denendi), KOK\simgeler\<paket>\scrcpy.png (+disconnected.png) yazar, scrcpy SCRCPY_ICON_DIR ile baslatilir. 12 APK'nin 11'inde simge bulundu (MLCChat yalnizca vektor -> scrcpy varsayilani). Exe ile 3 pencerede WM_GETICON ile dogrulandi. Exe 18.6 MB (Pillow + Tk).
 
 ## Siradaki
-1. Pencereye uygulama simgesi: scrcpy SCRCPY_ICON_DIR ortam degiskenini okur (icinde scrcpy.png); her scrcpy sureci icin APK simgesini (PNG) bir klasore cikarip bu degiskenle vermek denenmeli
+1. Uyarlanabilir simgede arka plan katmani (renk/bitmap) ile on plani birlestirmek; vektor (<vector>) simgeleri cizmek
 2. Acilis denetimi uygulama one gelip birkac sn ayakta kalinca erken bitebilir (5 sn sabit bekleme yerine)
 3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
 4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)

@@ -17,9 +17,10 @@ def _girdi(veri_turu, deger, kompakt=False):
     return struct.pack("<HHI", 8, 0, 0) + struct.pack("<HBBI", 8, 0, veri_turu, deger)
 
 
-def _tur_parcasi(dil, girdiler, ofset16=False):
+def _tur_parcasi(dil, girdiler, ofset16=False, yogunluk=0, tur_no=1):
     """girdiler: girdi numarasi sirasiyla bayt dizileri ya da None (girdi yok)."""
-    yapilandirma = struct.pack("<I4x", YAPILANDIRMA_BOYU) + dil.ljust(2, b"\0")
+    yapilandirma = struct.pack("<I4x", YAPILANDIRMA_BOYU) + dil.ljust(2, b"\0") + b"\0\0"
+    yapilandirma += struct.pack("<BBH", 0, 0, yogunluk)
     yapilandirma = yapilandirma.ljust(YAPILANDIRMA_BOYU, b"\0")
     baslik_boyu = 20 + YAPILANDIRMA_BOYU
     ofsetler, govde = [], b""
@@ -33,7 +34,7 @@ def _tur_parcasi(dil, girdiler, ofset16=False):
     dizin += b"\0" * (-len(dizin) % 4)
     girdi_basi = baslik_boyu + len(dizin)
     bayrak = kt.OFSET16 if ofset16 else 0
-    baslik = struct.pack("<HHIBBHII", kt.TUR, baslik_boyu, girdi_basi + len(govde), 1, bayrak, 0,
+    baslik = struct.pack("<HHIBBHII", kt.TUR, baslik_boyu, girdi_basi + len(govde), tur_no, bayrak, 0,
                          len(girdiler), girdi_basi)
     return baslik + yapilandirma + dizin + govde
 

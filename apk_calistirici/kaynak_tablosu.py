@@ -1,6 +1,7 @@
 """resources.arsc'den bir kaynagin degerini (ornegin @string/app_name) okur."""
 
 import struct
+from typing import NamedTuple
 
 from . import dizgi_havuzu
 
@@ -23,6 +24,19 @@ KOMPAKT = 0x0008
 
 # @string/a -> @string/b -> ... zincirinin en fazla uzunlugu
 EN_UZUN_ZINCIR = 8
+
+# ResTable_config.density ozel degerleri
+YOGUNLUK_HER = 0xFFFE  # anydpi (genelde uyarlanabilir simge XML'i)
+YOGUNLUK_YOK = 0xFFFF  # nodpi
+
+
+class Aday(NamedTuple):
+    """Bir kaynagin tek bir yapilandirmadaki degeri."""
+
+    dil: str
+    yogunluk: int
+    veri_turu: int
+    deger: int
 
 
 class KaynakTablosu:
@@ -57,12 +71,14 @@ class KaynakTablosu:
             konum += parca_boyu
 
     def _girdi(self, parca, girdi_no):
-        """Bir tur parcasindaki girdiyi (dil, veri turu, deger) olarak dondurur; yoksa None."""
+        """Bir tur parcasindaki girdiyi Aday olarak dondurur; yoksa None."""
         v = self.veri
         _, baslik_boyu, _ = struct.unpack_from("<HHI", v, parca)
         bayraklar = v[parca + 9]
-        sayi, girdi_basi = struct.unpack_from("<II", v, parca + 12)
-        dil = _dil(v[parca + 28 : parca + 30])  # ResTable_config.language
+        sayi, girdi_basi, yapilandirma_boyu = struct.unpack_from("<III", v, parca + 12)
+        # ResTable_config (parca + 20): language 8. baytta, density 14. baytta
+        dil = _dil(v[parca + 28 : parca + 30])
+        yogunluk = struct.unpack_from("<H", v, parca + 34)[0] if yapilandirma_boyu >= 16 else 0
         dizin = parca + baslik_boyu
         if bayraklar & SEYREK:
             for i in range(sayi):
@@ -88,16 +104,30 @@ class KaynakTablosu:
         girdi_boyu, girdi_bayraklari = struct.unpack_from("<HH", v, girdi)
         if girdi_bayraklari & KOMPAKT:
             (deger,) = struct.unpack_from("<I", v, girdi + 4)
-            return dil, girdi_bayraklari >> 8, deger
+            return Aday(dil, yogunluk, girdi_bayraklari >> 8, deger)
         if girdi_bayraklari & KARMASIK:
             return None
         _, _, veri_turu, deger = struct.unpack_from("<HBBI", v, girdi + girdi_boyu)
-        return dil, veri_turu, deger
+        return Aday(dil, yogunluk, veri_turu, deger)
+
+    def adaylar(self, kimlik):
+        """Kaynagin tum yapilandirmalardaki degerleri."""
+        paket_no, tur_no, girdi_no = kimlik >> 24, (kimlik >> 16) & 0xFF, kimlik & 0xFFFF
+        return [g for p in self.turler.get((paket_no, tur_no), []) if (g := self._girdi(p, girdi_no))]
+
+    def dosyalar(self, kimlik, _derinlik=0):
+        """Kaynagin APK icindeki dosya yollari: [(yogunluk, "res/mipmap-xxhdpi/ic_launcher.png"), ...]."""
+        sonuc = []
+        for aday in self.adaylar(kimlik):
+            if aday.veri_turu == TUR_STRING and aday.deger < len(self.dizgiler):
+                sonuc.append((aday.yogunluk, self.dizgiler[aday.deger]))
+            elif aday.veri_turu == TUR_REFERANS and _derinlik < EN_UZUN_ZINCIR:
+                sonuc.extend(self.dosyalar(aday.deger, _derinlik + 1))
+        return sonuc
 
     def dizgi(self, kimlik, diller=(), _derinlik=0):
         """Kaynak kimliginin dizgi degeri. diller: tercih sirasina gore dil kodlari ("tr", "en")."""
-        paket_no, tur_no, girdi_no = kimlik >> 24, (kimlik >> 16) & 0xFF, kimlik & 0xFFFF
-        adaylar = [g for p in self.turler.get((paket_no, tur_no), []) if (g := self._girdi(p, girdi_no))]
+        adaylar = self.adaylar(kimlik)
         if not adaylar:
             return None
 
@@ -107,7 +137,7 @@ class KaynakTablosu:
                 return diller.index(dil)
             return len(diller) if dil == "" else len(diller) + 1  # dilsiz varsayilan, sonra herhangi biri
 
-        _, veri_turu, deger = min(adaylar, key=oncelik)
+        _, _, veri_turu, deger = min(adaylar, key=oncelik)
         if veri_turu == TUR_STRING and deger < len(self.dizgiler):
             return self.dizgiler[deger]
         if veri_turu == TUR_REFERANS and _derinlik < EN_UZUN_ZINCIR:

@@ -260,8 +260,11 @@ def _ekran_boyutu():
     return genislik, yukseklik, genislik * 420 // 1080
 
 
-def ac(bilgi):
-    """Uygulamayi kendi sanal ekraninda, ayri bir scrcpy penceresinde acar."""
+def ac(bilgi, simge_klasoru=None):
+    """Uygulamayi kendi sanal ekraninda, ayri bir scrcpy penceresinde acar.
+
+    simge_klasoru: pencere simgesini (scrcpy.png) iceren klasor; yoksa scrcpy'nin simgesi.
+    """
     genislik, yukseklik, dpi = _ekran_boyutu()
     komut = [
         str(ayarlar.scrcpy_exe()),
@@ -276,11 +279,14 @@ def ac(bilgi):
         f"--window-title={bilgi.ad}",
     ]
     log.info("Açılıyor: %s", " ".join(komut))
+    ortam = ayarlar.ortam()
+    if simge_klasoru:
+        ortam["SCRCPY_ICON_DIR"] = str(simge_klasoru)
     _, cihaz_saati = adb("shell", "date", "+%s")
     gunluk_yolu = ayarlar.KOK / f"scrcpy-{bilgi.paket}.txt"
     with open(gunluk_yolu, "w", encoding="utf-8", errors="replace") as gunluk:
         surec = subprocess.Popen(
-            komut, stdout=gunluk, stderr=subprocess.STDOUT, env=ayarlar.ortam(),
+            komut, stdout=gunluk, stderr=subprocess.STDOUT, env=ortam,
             creationflags=ayarlar.PENCERESIZ | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     _acilisi_denetle(surec, bilgi, cihaz_saati.strip(), gunluk_yolu)

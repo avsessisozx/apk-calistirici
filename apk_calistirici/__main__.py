@@ -11,7 +11,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from . import apk, arayuz, ayarlar, iliskilendirme, kurulum, sanal_makine
+from . import apk, arayuz, ayarlar, iliskilendirme, kurulum, sanal_makine, simge
 
 log = logging.getLogger("apk_calistirici")
 
@@ -57,7 +57,7 @@ def apk_ac(yol):
         pencere.mesaj(f"{bilgi.ad} kuruluyor...")
         sanal_makine.kur(yol, bilgi)
         pencere.mesaj(f"{bilgi.ad} açılıyor...")
-        sanal_makine.ac(bilgi)
+        sanal_makine.ac(bilgi, simge.hazirla(yol, bilgi))
 
     return is_
 
