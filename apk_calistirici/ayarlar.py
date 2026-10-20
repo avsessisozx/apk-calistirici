@@ -3,13 +3,32 @@
 import json
 import os
 import subprocess
+import winreg
 from pathlib import Path
 
 UYGULAMA_ADI = "APK Çalıştırıcı"
 
-# Test icin APK_CALISTIRICI_KOK ile baska bir klasor verilebilir.
+KAYIT_ANAHTARI = r"Software\ApkCalistirici"
+
+
+def kayitli_konum():
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, KAYIT_ANAHTARI) as k:
+            return winreg.QueryValueEx(k, "Kok")[0]
+    except OSError:
+        return None
+
+
+def konum_kaydet(yol):
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, KAYIT_ANAHTARI) as k:
+        winreg.SetValueEx(k, "Kok", 0, winreg.REG_SZ, str(yol))
+
+
+# Bilesenlerin ve sanal telefonun durdugu klasor (birkac GB). Oncelik:
+# APK_CALISTIRICI_KOK ortam degiskeni, kayit defterindeki konum, %LOCALAPPDATA%.
 KOK = Path(
     os.environ.get("APK_CALISTIRICI_KOK")
+    or kayitli_konum()
     or Path(os.environ.get("LOCALAPPDATA", Path.home())) / "ApkCalistirici"
 )
 SDK = KOK / "sdk"

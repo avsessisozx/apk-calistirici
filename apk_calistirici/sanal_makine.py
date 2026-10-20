@@ -165,9 +165,13 @@ def _acilisi_bekle(surec):
     bitis = time.monotonic() + ACILIS_SURESI
     while time.monotonic() < bitis:
         if surec.poll() is not None:
-            raise SanalMakineHatasi(
-                "Android başlatılamadı.\n\n" + _gunluk_sonu(ayarlar.EMULATOR_GUNLUGU)
-            )
+            gunluk = _gunluk_sonu(ayarlar.EMULATOR_GUNLUGU)
+            if "Not enough space" in gunluk:
+                raise DiskDoluHatasi(
+                    "Sanal telefonun verileri için diskte yeterli boş alan yok. "
+                    "Biraz yer açıp tekrar deneyin.\n\n" + gunluk
+                )
+            raise SanalMakineHatasi("Android başlatılamadı.\n\n" + gunluk)
         if calisiyor_mu():
             _, deger = adb("shell", "getprop", "sys.boot_completed", zaman_asimi=10)
             if deger.strip() == "1":
@@ -189,6 +193,8 @@ def hazirla():
     with kilit():
         if calisiyor_mu():
             return
+        # Emulator acilista kendini adb sunucusuna bildirir; sunucu once ayakta olmali.
+        _calistir(ayarlar.adb_exe(), "start-server")
         for gpu in GPU_KIPLERI:
             baslangic = time.monotonic()
             try:
@@ -260,6 +266,9 @@ def ac(bilgi, baslik):
         "-s", ayarlar.SERI,
         f"--new-display={genislik}x{yukseklik}/{dpi}",
         f"--start-app={bilgi.paket}",
+        # Sanal ekranda baslatici olmasin: hem pencerede yalnizca uygulama gorunur hem de
+        # baslaticinin sonradan acilip uygulamanin ustune cikmasi (yaris durumu) onlenir.
+        "--no-vd-system-decorations",
         # Pencere kapaninca uygulama yok edilmesin, ana ekrana tasinsin.
         "--no-vd-destroy-content",
         f"--window-title={baslik}",

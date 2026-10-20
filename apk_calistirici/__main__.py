@@ -4,6 +4,7 @@
   apk-calistirici dosya.apk        APK'yi kur ve kendi penceresinde ac
   apk-calistirici --durdur         emulatoru kapat (anlik goruntu kaydedilir)
   apk-calistirici --iliskiyi-kaldir
+  apk-calistirici --konum E:\\klasor  bilesenlerin klasorunu degistir
 """
 
 import argparse
@@ -66,7 +67,12 @@ def main(argv=None):
     ayr.add_argument("apk", nargs="?", type=Path, help="açılacak .apk dosyası")
     ayr.add_argument("--durdur", action="store_true", help="Android'i kapat")
     ayr.add_argument("--iliskiyi-kaldir", action="store_true", help=".apk ilişkilendirmesini kaldır")
+    ayr.add_argument("--konum", type=Path, help="bileşenlerin kurulacağı klasörü kalıcı olarak ayarla")
     argumanlar = ayr.parse_args(argv)
+    if argumanlar.konum:
+        # Mevcut dosyalar tasinmaz; yeni klasor bossa ilk acilista bilesenler oraya indirilir.
+        ayarlar.konum_kaydet(argumanlar.konum.resolve())
+        return 0
     _gunluk_ayarla()
 
     if argumanlar.iliskiyi_kaldir:
