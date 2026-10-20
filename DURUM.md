@@ -48,10 +48,14 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 - GitHub Actions (.github/workflows/derle.yml): windows-latest, unittest, PyInstaller 6.22.3 --onefile --noconsole, duman testi (exe --iliskiyi-kaldir), artifact "ApkCalistirici" (~10 MB exe). Ilk calisma basarili (run 39492309631).
 - Exe ilk calismada kendini KOK\ApkCalistirici.exe'ye kopyalar, iliskilendirme o kopyayi gosterir (indirilen exe silinse de calisir). Applications\ApkCalistirici.exe kaydi ile 'Birlikte ac' listesinde gorunur.
 - Iliskilendirme exe ile dogrulandi (2026-10-20): HKCR\.apk -> ApkCalistirici.apk; Start-Process dosya.apk (Gezgin cift tikla ayni yol) -> uygulama penceresi acildi. Onceki varsayilan (LDPlayer, ldmnq.apk) HKCU\Software\ApkCalistirici\OncekiApkUygulamasi'na kaydedilir; --iliskiyi-kaldir onu geri yukler (dogrulandi). Kullanicinin PC'sinde iliskilendirme SU AN AKTIF. Ilk kayit yedekleri: E:\cloude\kayit-yedek.
+- ARM testi (2026-10-20): imaj abilist=x86_64,arm64-v8a, native bridge libndk_translation.so 0.2.3 (aarch64); abilist32 BOS -> sadece armeabi-v7a iceren APK'lar kurulamaz (NO_MATCHING_ABIS).
+  - mlc-chat (ai.mlc.mlcchat, arm64): kuruldu, arayuz 0.8 sn'de acildi, calisiyor. libtvm4j (103 MB) model baslatilinca yukleniyor; o asama test edilmedi.
+  - ReVanced (anddea.yrf.tube, arm64): kuruldu, 3 arm64 kutuphane (cronet, elements, google3) ceviriyle yuklendi, ana ekran 2.9 sn'de cizildi; sonra uygulama kendini kapatti cunku ReVanced GmsCore (app.revanced.android.gms) yok. ARM sorunu degil; GmsCore kurulursa tekrar denenmeli.
+  - Eden (dev.legacy.eden_emulator, arm64): acilista SIGILL ile coktu. ndk_translation "Undefined instruction 0xd53be000" = MRS x0, CNTFRQ_EL0 desteklenmiyor. Ceviriyle calismaz (Switch emulatoru, zaten agir JIT).
 
 ## Siradaki
 1. Pencere basligi su an paket adi; uygulama etiketi (resources.arsc) okunabilir ya da scrcpy ciktisindaki 'Starting app "X"' kullanilabilir
-2. Sadece arm64 APK'lar: x86_64 imajda ARM ceviri var mi test edilmeli (orn. Eden, mlc-chat, ReVanced)
+2. ARM uygulamasi acilista cokerse (logcat'te "ndk_translation: Undefined instruction") kullaniciya anlasilir mesaj goster; su an pencere bos kalir
 3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
 4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)
 5. Kurulu APK'yi tekrar acarken 4 sn scrcpy denetim beklemesi kisaltilabilir (pencere acildigini gunlukten anla)

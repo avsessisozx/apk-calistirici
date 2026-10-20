@@ -26,7 +26,8 @@ GPU_KIPLERI = ("host", "auto")
 
 # Sik gorulen kurulum hatalarinin kullaniciya gosterilecek aciklamalari
 KURULUM_HATALARI = {
-    "INSTALL_FAILED_NO_MATCHING_ABIS": "Bu uygulama bilgisayarın işlemci mimarisini desteklemiyor (yalnızca ARM).",
+    # Sistem imaji x86_64 ve arm64'u (ceviriyle) calistirir, 32 bit ARM'i calistiramaz.
+    "INSTALL_FAILED_NO_MATCHING_ABIS": "Bu uygulama yalnızca 32 bit ARM için derlenmiş, desteklenmiyor.",
     "INSTALL_FAILED_UPDATE_INCOMPATIBLE": "Aynı uygulamanın farklı imzalı bir sürümü zaten kurulu. Önce onu kaldırın.",
     "INSTALL_FAILED_VERSION_DOWNGRADE": "Daha yeni bir sürümü zaten kurulu.",
     "INSTALL_FAILED_OLDER_SDK": "Bu uygulama daha yeni bir Android sürümü istiyor.",
