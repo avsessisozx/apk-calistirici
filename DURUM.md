@@ -56,7 +56,7 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 - Pencere basligi = uygulamanin gercek adi (2026-10-20): manifest'teki application android:label; referanssa resources.arsc okunur (kaynak_tablosu.py: standart/kompakt/sparse/offset16 girdiler, referans zinciri). Dil tercihi: Windows arayuz dili, en, dilsiz varsayilan. Okunamazsa paket adi. Downloads'taki 12 APK'nin hepsinde ad bulundu (en yavas 480 ms), exe ile 3 pencerede dogrulandi ("APKMirror Yukleyici (beta)" Turkce secildi). Durum ve cokme mesajlari da adi kullanir.
 
 ## Siradaki
-1. Pencereye uygulama simgesi (scrcpy --window-icon yok; SDL penceresine Win32 ile WM_SETICON denenebilir)
+1. Pencereye uygulama simgesi: scrcpy SCRCPY_ICON_DIR ortam degiskenini okur (icinde scrcpy.png); her scrcpy sureci icin APK simgesini (PNG) bir klasore cikarip bu degiskenle vermek denenmeli
 2. Acilis denetimi uygulama one gelip birkac sn ayakta kalinca erken bitebilir (5 sn sabit bekleme yerine)
 3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
 4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)
