@@ -20,18 +20,18 @@ class Cokme:
     tur: str
     ayrinti: str
 
-    def mesaj(self, paket):
+    def mesaj(self, ad):
         if self.tur == ARM:
             return (
-                f"{paket} açılırken kapandı.\n\n"
+                f"{ad} açılırken kapandı.\n\n"
                 "Bu uygulama ARM işlemciler (telefonlar) için derlenmiş. Bilgisayarınız onu "
                 "çeviri yoluyla çalıştırıyor, ancak uygulamanın kullandığı bir işlemci komutu "
                 "çevrilemiyor. Uygulamanın x86_64 (Intel/AMD) sürümü varsa onu deneyin.\n\n"
                 f"Ayrıntı: {self.ayrinti}"
             )
         if self.tur == JAVA:
-            return f"{paket} açılırken çöktü.\n\nAyrıntı: {self.ayrinti}"
-        return f"{paket} açılırken çöktü (yerel kod hatası).\n\nAyrıntı: {self.ayrinti}"
+            return f"{ad} açılırken çöktü.\n\nAyrıntı: {self.ayrinti}"
+        return f"{ad} açılırken çöktü (yerel kod hatası).\n\nAyrıntı: {self.ayrinti}"
 
 
 def coz(satirlar, paket, pidler=()):

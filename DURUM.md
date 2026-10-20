@@ -53,9 +53,10 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
   - ReVanced (anddea.yrf.tube, arm64): kuruldu, 3 arm64 kutuphane (cronet, elements, google3) ceviriyle yuklendi, ana ekran 2.9 sn'de cizildi; sonra uygulama kendini kapatti cunku ReVanced GmsCore (app.revanced.android.gms) yok. ARM sorunu degil; GmsCore kurulursa tekrar denenmeli.
   - Eden (dev.legacy.eden_emulator, arm64): acilista SIGILL ile coktu. ndk_translation "Undefined instruction 0xd53be000" = MRS x0, CNTFRQ_EL0 desteklenmiyor. Ceviriyle calismaz (Switch emulatoru, zaten agir JIT).
 - Acilis cokme denetimi (cokme.py): scrcpy baslatildiktan sonra 5 sn boyunca logcat (-T cihaz saati, -s ndk_translation/AndroidRuntime/libc/ActivityManager) ve pidof izlenir. ARM ceviri hatasi > Java cokmesi > yerel sinyal sirasiyla siniflandirilir, bos pencere kapatilir, Turkce aciklama gosterilir. Eden ile exe uzerinden dogrulandi (cokme 1.4 sn'de yakalandi); KeyAttestation'da yanlis alarm yok. Bu denetim kurulu uygulamayi acmayi ~5 sn yapiyor (onceki 4 sn scrcpy beklemesinin yerine).
+- Pencere basligi = uygulamanin gercek adi (2026-10-20): manifest'teki application android:label; referanssa resources.arsc okunur (kaynak_tablosu.py: standart/kompakt/sparse/offset16 girdiler, referans zinciri). Dil tercihi: Windows arayuz dili, en, dilsiz varsayilan. Okunamazsa paket adi. Downloads'taki 12 APK'nin hepsinde ad bulundu (en yavas 480 ms), exe ile 3 pencerede dogrulandi ("APKMirror Yukleyici (beta)" Turkce secildi). Durum ve cokme mesajlari da adi kullanir.
 
 ## Siradaki
-1. Pencere basligi su an paket adi; uygulama etiketi (resources.arsc) okunabilir ya da scrcpy ciktisindaki 'Starting app "X"' kullanilabilir
+1. Pencereye uygulama simgesi (scrcpy --window-icon yok; SDL penceresine Win32 ile WM_SETICON denenebilir)
 2. Acilis denetimi uygulama one gelip birkac sn ayakta kalinca erken bitebilir (5 sn sabit bekleme yerine)
 3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
 4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)

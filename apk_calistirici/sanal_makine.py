@@ -260,7 +260,7 @@ def _ekran_boyutu():
     return genislik, yukseklik, genislik * 420 // 1080
 
 
-def ac(bilgi, baslik):
+def ac(bilgi):
     """Uygulamayi kendi sanal ekraninda, ayri bir scrcpy penceresinde acar."""
     genislik, yukseklik, dpi = _ekran_boyutu()
     komut = [
@@ -273,7 +273,7 @@ def ac(bilgi, baslik):
         "--no-vd-system-decorations",
         # Pencere kapaninca uygulama yok edilmesin, ana ekrana tasinsin.
         "--no-vd-destroy-content",
-        f"--window-title={baslik}",
+        f"--window-title={bilgi.ad}",
     ]
     log.info("Açılıyor: %s", " ".join(komut))
     _, cihaz_saati = adb("shell", "date", "+%s")
@@ -283,11 +283,11 @@ def ac(bilgi, baslik):
             komut, stdout=gunluk, stderr=subprocess.STDOUT, env=ayarlar.ortam(),
             creationflags=ayarlar.PENCERESIZ | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
-    _acilisi_denetle(surec, bilgi.paket, cihaz_saati.strip(), gunluk_yolu)
+    _acilisi_denetle(surec, bilgi, cihaz_saati.strip(), gunluk_yolu)
     return surec
 
 
-def _acilisi_denetle(surec, paket, cihaz_saati, gunluk_yolu):
+def _acilisi_denetle(surec, bilgi, cihaz_saati, gunluk_yolu):
     """Pencere ya da uygulama hemen kapanirsa kullaniciya nedenini gosterir."""
     pidler = set()
     bitis = time.monotonic() + ACILIS_DENETIM_SURESI
@@ -295,17 +295,17 @@ def _acilisi_denetle(surec, paket, cihaz_saati, gunluk_yolu):
         kod = surec.poll()
         if kod not in (None, 0):
             raise SanalMakineHatasi("Uygulama penceresi açılamadı.\n\n" + _gunluk_sonu(gunluk_yolu))
-        _, pid = adb("shell", "pidof", paket, zaman_asimi=10)
+        _, pid = adb("shell", "pidof", bilgi.paket, zaman_asimi=10)
         pidler.update(int(p) for p in pid.split() if p.isdigit())
         _, satirlar = adb(
             "logcat", "-d", "-b", "main,system,crash", "-T", f"{cihaz_saati}.000",
             "-s", *cokme.ETIKETLER, zaman_asimi=20,
         )
-        bulunan = cokme.coz(satirlar.splitlines(), paket, pidler)
+        bulunan = cokme.coz(satirlar.splitlines(), bilgi.paket, pidler)
         if bulunan:
-            log.error("%s çöktü: %s", paket, bulunan)
+            log.error("%s çöktü: %s", bilgi.paket, bulunan)
             surec.terminate()  # bos kalan pencereyi kapat
-            raise SanalMakineHatasi(bulunan.mesaj(paket))
+            raise SanalMakineHatasi(bulunan.mesaj(bilgi.ad))
         if kod == 0:
             return  # kullanici pencereyi kapatti
         time.sleep(0.5)

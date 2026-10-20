@@ -1,16 +1,23 @@
 """APK icindeki ikili AndroidManifest.xml'den paket bilgisini okur (aapt gerekmez)."""
 
+import ctypes
+import locale
+import logging
 import struct
 import zipfile
 from dataclasses import dataclass, field
 
-STRING_POOL = 0x0001
+from . import dizgi_havuzu
+from .kaynak_tablosu import KaynakTablosu
+
+log = logging.getLogger(__name__)
+
 XML = 0x0003
 XML_RESOURCE_MAP = 0x0180
 XML_START_ELEMENT = 0x0102
 
-UTF8_BAYRAGI = 0x100
 DEGER_YOK = 0xFFFFFFFF
+TUR_REFERANS = 0x01
 TUR_STRING = 0x03
 
 # android:* ozniteliklerinin kaynak kimlikleri (isimleri karartilmis APK'larda da gecerli)
@@ -18,7 +25,12 @@ KAYNAK_KIMLIKLERI = {
     0x0101021B: "versionCode",
     0x0101021C: "versionName",
     0x0101020C: "minSdkVersion",
+    0x01010001: "label",
 }
+
+
+class Referans(int):
+    """@string/app_name gibi bir kaynak kimligi."""
 
 
 @dataclass
@@ -27,7 +39,12 @@ class ApkBilgisi:
     surum_kodu: int = 0
     surum_adi: str = ""
     min_sdk: int = 0
+    etiket: str = ""  # uygulamanin gorunen adi; bulunamazsa bos
     abiler: list = field(default_factory=list)
+
+    @property
+    def ad(self):
+        return self.etiket or self.paket
 
     def x86_destekli(self):
         """Yerel kutuphanesi yoksa ya da x86 icin derlenmisse ceviri gerekmez."""
@@ -38,16 +55,37 @@ class ApkHatasi(Exception):
     pass
 
 
-def oku(yol):
+def sistem_dilleri():
+    """Windows arayuz dili ve Ingilizce, tercih sirasiyla ("tr", "en")."""
+    try:
+        kod = locale.windows_locale.get(ctypes.windll.kernel32.GetUserDefaultUILanguage(), "")
+    except (AttributeError, OSError):
+        kod = ""
+    dil = kod.split("_")[0]
+    return tuple(dict.fromkeys(d for d in (dil, "en") if d))
+
+
+def oku(yol, diller=None):
     try:
         with zipfile.ZipFile(yol) as z:
             manifest = z.read("AndroidManifest.xml")
             abiler = sorted({ad.split("/")[1] for ad in z.namelist() if ad.startswith("lib/") and ad.count("/") >= 2})
+            bilgi = manifest_coz(manifest)
+            bilgi.abiler = abiler
+            if isinstance(bilgi.etiket, Referans):
+                bilgi.etiket = _etiket_coz(z, bilgi.etiket, sistem_dilleri() if diller is None else diller)
     except (zipfile.BadZipFile, KeyError, OSError) as e:
         raise ApkHatasi(f"Geçerli bir APK değil: {e}") from e
-    bilgi = manifest_coz(manifest)
-    bilgi.abiler = abiler
     return bilgi
+
+
+def _etiket_coz(z, kimlik, diller):
+    # Uygulama adi bulunamazsa paket adi kullanilir; APK'yi acmaya engel degil.
+    try:
+        return KaynakTablosu(z.read("resources.arsc")).dizgi(kimlik, diller) or ""
+    except (KeyError, ValueError, struct.error, IndexError):
+        log.warning("Uygulama adı okunamadı (%#x)", kimlik, exc_info=True)
+        return ""
 
 
 def manifest_coz(veri):
@@ -56,13 +94,14 @@ def manifest_coz(veri):
         raise ApkHatasi("AndroidManifest.xml ikili XML değil.")
     dizgiler, kaynaklar = [], []
     oznitelikler = {}
+    etiket = ""
     konum = baslik_boyu
     while konum + 8 <= len(veri):
         tur, baslik_boyu, boyut = struct.unpack_from("<HHI", veri, konum)
         if boyut < 8:
             break
-        if tur == STRING_POOL:
-            dizgiler = _dizgi_havuzu(veri, konum, baslik_boyu)
+        if tur == dizgi_havuzu.TUR:
+            dizgiler = dizgi_havuzu.oku(veri, konum, baslik_boyu)
         elif tur == XML_RESOURCE_MAP:
             kaynaklar = list(struct.unpack_from(f"<{(boyut - baslik_boyu) // 4}I", veri, konum + baslik_boyu))
         elif tur == XML_START_ELEMENT:
@@ -70,6 +109,7 @@ def manifest_coz(veri):
             if ad in ("manifest", "uses-sdk"):
                 oznitelikler.update(ozellikler)
             if ad == "application":
+                etiket = ozellikler.get("label", "")
                 break
         konum += boyut
 
@@ -81,6 +121,7 @@ def manifest_coz(veri):
         surum_kodu=_tamsayi(oznitelikler.get("versionCode")),
         surum_adi=str(oznitelikler.get("versionName") or ""),
         min_sdk=_tamsayi(oznitelikler.get("minSdkVersion")),
+        etiket=etiket if isinstance(etiket, Referans) else str(etiket),
     )
 
 
@@ -105,6 +146,8 @@ def _eleman(veri, konum, baslik_boyu, dizgiler, kaynaklar):
             ozellikler[oz_ad] = _dizgi(dizgiler, ham)
         elif veri_turu == TUR_STRING:
             ozellikler[oz_ad] = _dizgi(dizgiler, deger)
+        elif veri_turu == TUR_REFERANS:
+            ozellikler[oz_ad] = Referans(deger)
         else:
             ozellikler[oz_ad] = deger
     return _dizgi(dizgiler, ad_no), ozellikler
@@ -112,33 +155,3 @@ def _eleman(veri, konum, baslik_boyu, dizgiler, kaynaklar):
 
 def _dizgi(dizgiler, no):
     return dizgiler[no] if no < len(dizgiler) else ""
-
-
-def _dizgi_havuzu(veri, konum, baslik_boyu):
-    sayi, _, bayraklar, dizgi_basi, _ = struct.unpack_from("<IIIII", veri, konum + 8)
-    konumlar = struct.unpack_from(f"<{sayi}I", veri, konum + baslik_boyu)
-    taban = konum + dizgi_basi
-    utf8 = bayraklar & UTF8_BAYRAGI
-    return [_utf8_dizgi(veri, taban + k) if utf8 else _utf16_dizgi(veri, taban + k) for k in konumlar]
-
-
-def _utf8_dizgi(veri, k):
-    def uzunluk(k):
-        n = veri[k]
-        if n & 0x80:
-            return ((n & 0x7F) << 8) | veri[k + 1], k + 2
-        return n, k + 1
-
-    _, k = uzunluk(k)  # karakter sayisi
-    bayt, k = uzunluk(k)
-    return veri[k : k + bayt].decode("utf-8", "replace")
-
-
-def _utf16_dizgi(veri, k):
-    (n,) = struct.unpack_from("<H", veri, k)
-    k += 2
-    if n & 0x8000:
-        (alt,) = struct.unpack_from("<H", veri, k)
-        n = ((n & 0x7FFF) << 16) | alt
-        k += 2
-    return veri[k : k + n * 2].decode("utf-16-le", "replace")

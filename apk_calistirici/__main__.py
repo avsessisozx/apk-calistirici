@@ -54,10 +54,10 @@ def apk_ac(yol):
             kurulum.kur(pencere)
         pencere.mesaj("Android başlatılıyor...")
         sanal_makine.hazirla()
-        pencere.mesaj(f"{bilgi.paket} kuruluyor...")
+        pencere.mesaj(f"{bilgi.ad} kuruluyor...")
         sanal_makine.kur(yol, bilgi)
-        pencere.mesaj(f"{bilgi.paket} açılıyor...")
-        sanal_makine.ac(bilgi, bilgi.paket)
+        pencere.mesaj(f"{bilgi.ad} açılıyor...")
+        sanal_makine.ac(bilgi)
 
     return is_
 
