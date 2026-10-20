@@ -19,14 +19,23 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
 ## Yapildi
 - Repo acildi, README
 - Altyapi dogrulandi (yukaridaki liste)
+- AVD "test" duzeltildi: hw.ramSize 96M -> 4096, hw.gpu.enabled=yes, hw.gpu.mode=host, hw.cpu.ncore=4, hw.keyboard=yes (yedek: config.ini.bak). Uygulama kendi AVD'sini olustururken bu degerleri yazmali.
+- Olcum (2026-10-20): soguk acilis 20 sn (-no-snapshot-load), snapshot'tan acilis 5 sn (-no-window). Snapshot kaydi kapanista ~1 sn.
+- GPU: GTX 1050 Ti ile host GLES calisiyor (OpenGL ES 3.1), WHPX aktif.
+- scrcpy v5.0.1 (C:pk-test\scrcpy-win64-v5.0.1). ADB ortam degiskeni SDK adb'sine ayarlanmali (surum uyumsuzlugu olmasin).
+- Calisan komut: scrcpy -s emulator-5584 --new-display=1080x1920/420 --start-app=<paket> --no-audio --window-title=<ad>
+  -> uygulama ayri sanal ekranda, ana ekranda launcher kaliyor. Iki uygulama ayni anda iki pencerede dogrulandi (display 2 ve 3).
+  -> Emulator -no-window iken de calisiyor; scrcpy D3D11VA donanim cozumleme kullaniyor.
+- APK kurulum: adb install -r. KeyAttestation (1.3 MB) 0.5 sn, Nekogram x86_64 (48 MB) 6 sn.
 
 ## Siradaki
-1. Emulatoru -port 5584 ile ac, acilis suresi ve akicilik olc (SONUC HENUZ YOK)
-2. scrcpy indir, APK kur, uygulamayi ayri pencerede ac (-new-display / --start-app)
-3. Python uygulamasi: ilk kurulum, VM yonetimi, .apk baglama
-4. GitHub Actions: exe derleme + test
-5. Snapshot ile hizli acilis
+1. Python uygulamasi: ilk kurulum, VM yonetimi, .apk baglama
+2. GitHub Actions: exe derleme + test
+3. Snapshot akisi: emulator arka planda -no-window acik kalsin, kapanista snapshot; paket adini APK'dan oku (aapt2/androguard)
+4. Ana ekran (display 0) 320x640 kucuk; -no-window'da onemsiz ama skin/cozunurluk ayari dusunulmeli
+5. Sadece arm64 APK'lar: x86_64 imajda ARM ceviri (ndk_translation) var mi test edilmeli
 
 ## Bilinen sorunlar
 - Bulut ortamindan dl.google.com ve GitHub API erisilemiyor; indirme/test sadece kullanicinin PC'sinde
+- scrcpy kapaninca sanal ekran ve icindeki uygulama penceresi yok oluyor (FLAG_DESTROY_CONTENT_ON_REMOVAL); uygulama durumu korunmuyor olabilir, test et
 - Computer use ile Windows terminaline yazilamiyor; testler yerel (Code sekmesi) oturumdan yapilmali
