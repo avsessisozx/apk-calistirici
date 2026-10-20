@@ -12,13 +12,14 @@ import shutil
 import subprocess
 import time
 
-from . import ayarlar
+from . import ayarlar, cokme
 
 log = logging.getLogger(__name__)
 
 ACILIS_SURESI = 300
 KURULUM_SURESI = 600
-SCRCPY_DENETIM_SURESI = 4
+# Bu sure icinde pencere kapanir ya da uygulama coker ise kullaniciya nedeni gosterilir.
+ACILIS_DENETIM_SURESI = 5
 VERI_DISKI_EN_AZ_GB = 2
 VERI_DISKI_EN_COK_GB = 8
 # Once ekran karti; acilamazsa emulatorun kendi secimi (gerekirse yazilimsal cizim).
@@ -275,17 +276,36 @@ def ac(bilgi, baslik):
         f"--window-title={baslik}",
     ]
     log.info("Açılıyor: %s", " ".join(komut))
+    _, cihaz_saati = adb("shell", "date", "+%s")
     gunluk_yolu = ayarlar.KOK / f"scrcpy-{bilgi.paket}.txt"
     with open(gunluk_yolu, "w", encoding="utf-8", errors="replace") as gunluk:
         surec = subprocess.Popen(
             komut, stdout=gunluk, stderr=subprocess.STDOUT, env=ayarlar.ortam(),
             creationflags=ayarlar.PENCERESIZ | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
-    # Hemen kapanirsa (uygulama baslatilamadi vb.) kullaniciya nedenini goster.
-    try:
-        kod = surec.wait(SCRCPY_DENETIM_SURESI)
-    except subprocess.TimeoutExpired:
-        return surec
-    if kod != 0:
-        raise SanalMakineHatasi("Uygulama penceresi açılamadı.\n\n" + _gunluk_sonu(gunluk_yolu))
+    _acilisi_denetle(surec, bilgi.paket, cihaz_saati.strip(), gunluk_yolu)
     return surec
+
+
+def _acilisi_denetle(surec, paket, cihaz_saati, gunluk_yolu):
+    """Pencere ya da uygulama hemen kapanirsa kullaniciya nedenini gosterir."""
+    pidler = set()
+    bitis = time.monotonic() + ACILIS_DENETIM_SURESI
+    while time.monotonic() < bitis:
+        kod = surec.poll()
+        if kod not in (None, 0):
+            raise SanalMakineHatasi("Uygulama penceresi açılamadı.\n\n" + _gunluk_sonu(gunluk_yolu))
+        _, pid = adb("shell", "pidof", paket, zaman_asimi=10)
+        pidler.update(int(p) for p in pid.split() if p.isdigit())
+        _, satirlar = adb(
+            "logcat", "-d", "-b", "main,system,crash", "-T", f"{cihaz_saati}.000",
+            "-s", *cokme.ETIKETLER, zaman_asimi=20,
+        )
+        bulunan = cokme.coz(satirlar.splitlines(), paket, pidler)
+        if bulunan:
+            log.error("%s çöktü: %s", paket, bulunan)
+            surec.terminate()  # bos kalan pencereyi kapat
+            raise SanalMakineHatasi(bulunan.mesaj(paket))
+        if kod == 0:
+            return  # kullanici pencereyi kapatti
+        time.sleep(0.5)

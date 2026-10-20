@@ -52,13 +52,13 @@ Amac: Windows'ta .apk'ya cift tikla, Android uygulamasi kendi penceresinde acils
   - mlc-chat (ai.mlc.mlcchat, arm64): kuruldu, arayuz 0.8 sn'de acildi, calisiyor. libtvm4j (103 MB) model baslatilinca yukleniyor; o asama test edilmedi.
   - ReVanced (anddea.yrf.tube, arm64): kuruldu, 3 arm64 kutuphane (cronet, elements, google3) ceviriyle yuklendi, ana ekran 2.9 sn'de cizildi; sonra uygulama kendini kapatti cunku ReVanced GmsCore (app.revanced.android.gms) yok. ARM sorunu degil; GmsCore kurulursa tekrar denenmeli.
   - Eden (dev.legacy.eden_emulator, arm64): acilista SIGILL ile coktu. ndk_translation "Undefined instruction 0xd53be000" = MRS x0, CNTFRQ_EL0 desteklenmiyor. Ceviriyle calismaz (Switch emulatoru, zaten agir JIT).
+- Acilis cokme denetimi (cokme.py): scrcpy baslatildiktan sonra 5 sn boyunca logcat (-T cihaz saati, -s ndk_translation/AndroidRuntime/libc/ActivityManager) ve pidof izlenir. ARM ceviri hatasi > Java cokmesi > yerel sinyal sirasiyla siniflandirilir, bos pencere kapatilir, Turkce aciklama gosterilir. Eden ile exe uzerinden dogrulandi (cokme 1.4 sn'de yakalandi); KeyAttestation'da yanlis alarm yok. Bu denetim kurulu uygulamayi acmayi ~5 sn yapiyor (onceki 4 sn scrcpy beklemesinin yerine).
 
 ## Siradaki
 1. Pencere basligi su an paket adi; uygulama etiketi (resources.arsc) okunabilir ya da scrcpy ciktisindaki 'Starting app "X"' kullanilabilir
-2. ARM uygulamasi acilista cokerse (logcat'te "ndk_translation: Undefined instruction") kullaniciya anlasilir mesaj goster; su an pencere bos kalir
+2. Acilis denetimi uygulama one gelip birkac sn ayakta kalinca erken bitebilir (5 sn sabit bekleme yerine)
 3. Hic pencere kalmayinca emulatoru otomatik kapatma (snapshot) / bolunmus APK (.apks/.xapk) destegi
 4. Exe simgesi, surum bilgisi; tag'de GitHub Release'e exe yukleme (kullanici onayi ile)
-5. Kurulu APK'yi tekrar acarken 4 sn scrcpy denetim beklemesi kisaltilabilir (pencere acildigini gunlukten anla)
 
 ## Bilinen sorunlar
 - Bulut ortamindan dl.google.com ve GitHub API erisilemiyor; indirme/test sadece kullanicinin PC'sinde
